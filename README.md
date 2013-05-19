@@ -237,18 +237,6 @@ The easytags plug-in defines new highlighting groups for dynamically highlighted
 
 As you can see each of these names ends in `Tag` to avoid conflicts with the syntax modes shipped with Vim. And about the singular/plural confusion: I've tried to match the existing highlighting groups defined by popular syntax modes (except of course for the `Tag` suffix).
 
-## Faster syntax highlighting using Python
-
-The Vim script implementation of dynamic syntax highlighting is quite slow on large tags files. When the Python Interface to Vim is enabled the easytags plug-in will therefor automatically use a Python script that performs dynamic syntax highlighting about twice as fast as the Vim script implementation. The following options are available to change the default configuration.
-
-### The `g:easytags_python_enabled` option
-
-To disable the Python implementation of dynamic syntax highlighting you can set this option to false (0).
-
-### The `g:easytags_python_script` option
-
-This option defines the pathname of the script that contains the Python implementation of dynamic syntax highlighting.
-
 ## Troubleshooting
 
 ### `:HighlightTags` only works for the tags file created by `:UpdateTags`

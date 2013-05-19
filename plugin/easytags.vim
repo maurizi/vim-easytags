@@ -1,6 +1,6 @@
 " Vim plug-in
 " Author: Peter Odding <peter@peterodding.com>
-" Last Change: May 13, 2013
+" Last Change: May 20, 2013
 " URL: http://peterodding.com/code/vim/easytags/
 " Requires: Exuberant Ctags (http://ctags.sf.net)
 
@@ -42,10 +42,6 @@ endif
 
 if !exists('g:easytags_ignored_syntax_groups')
   let g:easytags_ignored_syntax_groups = '.*String.*,.*Comment.*,cIncluded'
-endif
-
-if !exists('g:easytags_python_script')
-  let g:easytags_python_script = expand('<sfile>:p:h') . '/../misc/easytags/highlight.py'
 endif
 
 function! s:InitEasyTags(version)

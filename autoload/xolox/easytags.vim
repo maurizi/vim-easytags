@@ -340,14 +340,12 @@ function! s:find_tagged_files(entries, context) " {{{3
 endfunction
 
 function! xolox#easytags#highlight() " {{{2
-  " TODO This is a mess; Re-implement Python version in Vim script, benchmark, remove Python version.
   try
     " Treat C++ and Objective-C as plain C.
     let filetype = get(s:canonical_aliases, &ft, &ft)
     let tagkinds = get(s:tagkinds, filetype, [])
     if exists('g:syntax_on') && !empty(tagkinds) && !exists('b:easytags_nohl')
       let starttime = xolox#misc#timer#start()
-      let used_python = 0
       for tagkind in tagkinds
         let hlgroup_tagged = tagkind.hlgroup . 'Tag'
         " Define style on first run, clear highlighting on later runs.
@@ -356,44 +354,36 @@ function! xolox#easytags#highlight() " {{{2
         else
           execute 'syntax clear' hlgroup_tagged
         endif
-        " Try to perform the highlighting using the fast Python script.
-        " TODO The tags files are read multiple times by the Python script
-        "      within one run of xolox#easytags#highlight()
-        if s:highlight_with_python(hlgroup_tagged, tagkind)
-          let used_python = 1
-        else
-          " Fall back to the slow and naive Vim script implementation.
-          if !exists('taglist')
-            " Get the list of tags when we need it and remember the results.
-            if !has_key(s:aliases, filetype)
-              let ctags_filetype = xolox#easytags#to_ctags_ft(filetype)
-              let taglist = filter(taglist('.'), "get(v:val, 'language', '') ==? ctags_filetype")
-            else
-              let aliases = s:aliases[&ft]
-              let taglist = filter(taglist('.'), "has_key(aliases, tolower(get(v:val, 'language', '')))")
-            endif
-          endif
-          " Filter a copy of the list of tags to the relevant kinds.
-          if has_key(tagkind, 'tagkinds')
-            let filter = 'v:val.kind =~ tagkind.tagkinds'
+        if !exists('taglist')
+          " Get the list of tags when we need it and remember the results.
+          if !has_key(s:aliases, filetype)
+            let ctags_filetype = xolox#easytags#to_ctags_ft(filetype)
+            let taglist = filter(taglist('.'), "get(v:val, 'language', '') ==? ctags_filetype")
           else
-            let filter = tagkind.vim_filter
+            let aliases = s:aliases[&ft]
+            let taglist = filter(taglist('.'), "has_key(aliases, tolower(get(v:val, 'language', '')))")
           endif
-          let matches = filter(copy(taglist), filter)
-          if matches != []
-            " Convert matched tags to :syntax command and execute it.
-            let matches = xolox#misc#list#unique(map(matches, 'xolox#misc#escape#pattern(get(v:val, "name"))'))
-            let pattern = tagkind.pattern_prefix . '\%(' . join(matches, '\|') . '\)' . tagkind.pattern_suffix
-            let template = 'syntax match %s /%s/ containedin=ALLBUT,%s'
-            let command = printf(template, hlgroup_tagged, escape(pattern, '/'), xolox#misc#option#get('easytags_ignored_syntax_groups'))
-            call xolox#misc#msg#debug("easytags.vim %s: Executing command '%s'.", g:xolox#easytags#version, command)
-            try
-              execute command
-            catch /^Vim\%((\a\+)\)\=:E339/
-              let msg = "easytags.vim %s: Failed to highlight %i %s tags because pattern is too big! (%i KB)"
-              call xolox#misc#msg#warn(msg, g:xolox#easytags#version, len(matches), tagkind.hlgroup, len(pattern) / 1024)
-            endtry
-          endif
+        endif
+        " Filter a copy of the list of tags to the relevant kinds.
+        if has_key(tagkind, 'tagkinds')
+          let filter = 'v:val.kind =~ tagkind.tagkinds'
+        else
+          let filter = tagkind.vim_filter
+        endif
+        let matches = filter(copy(taglist), filter)
+        if matches != []
+          " Convert matched tags to :syntax command and execute it.
+          let matches = xolox#misc#list#unique(map(matches, 'xolox#misc#escape#pattern(get(v:val, "name"))'))
+          let pattern = tagkind.pattern_prefix . '\%(' . join(matches, '\|') . '\)' . tagkind.pattern_suffix
+          let template = 'syntax match %s /%s/ containedin=ALLBUT,%s'
+          let command = printf(template, hlgroup_tagged, escape(pattern, '/'), xolox#misc#option#get('easytags_ignored_syntax_groups'))
+          call xolox#misc#msg#debug("easytags.vim %s: Executing command '%s'.", g:xolox#easytags#version, command)
+          try
+            execute command
+          catch /^Vim\%((\a\+)\)\=:E339/
+            let msg = "easytags.vim %s: Failed to highlight %i %s tags because pattern is too big! (%i KB)"
+            call xolox#misc#msg#warn(msg, g:xolox#easytags#version, len(matches), tagkind.hlgroup, len(pattern) / 1024)
+          endtry
         endif
       endfor
       redraw
@@ -401,8 +391,8 @@ function! xolox#easytags#highlight() " {{{2
       if bufname == ''
         let bufname = 'unnamed buffer #' . bufnr('%')
       endif
-      let msg = "easytags.vim %s: Highlighted tags in %s in %s%s."
-      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, bufname, starttime, used_python ? " (using Python)" : "")
+      let msg = "easytags.vim %s: Highlighted tags in %s in %s."
+      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, bufname, starttime)
       return 1
     endif
   catch
@@ -755,51 +745,6 @@ function! s:canonicalize(filename, context) " {{{2
   return ''
 endfunction
 
-function! s:python_available() " {{{2
-  if !exists('s:is_python_available')
-    try
-      execute 'pyfile' fnameescape(g:easytags_python_script)
-      redir => output
-        silent python easytags_ping()
-      redir END
-      let s:is_python_available = (output =~ 'it works!')
-    catch
-      let s:is_python_available = 0
-    endtry
-  endif
-  return s:is_python_available
-endfunction
-
-function! s:highlight_with_python(syntax_group, tagkind) " {{{2
-  if xolox#misc#option#get('easytags_python_enabled', 1) && s:python_available()
-    " Gather arguments for Python function.
-    let context = {}
-    let context['tagsfiles'] = tagfiles()
-    let context['syntaxgroup'] = a:syntax_group
-    let applicable_filetypes = xolox#easytags#select_supported_filetypes(&ft)
-    let context['filetype'] = xolox#easytags#to_ctags_ft(applicable_filetypes[0])
-    let context['tagkinds'] = get(a:tagkind, 'tagkinds', '')
-    let context['prefix'] = get(a:tagkind, 'pattern_prefix', '')
-    let context['suffix'] = get(a:tagkind, 'pattern_suffix', '')
-    let context['filters'] = get(a:tagkind, 'python_filter', {})
-    let context['ignoresyntax'] = xolox#misc#option#get('easytags_ignored_syntax_groups')
-    " Call the Python function and intercept the output.
-    try
-      redir => commands
-      python import vim
-      silent python print easytags_gensyncmd(**vim.eval('context'))
-      redir END
-      execute commands
-      return 1
-    catch
-      redir END
-      " If the Python script raised an error, don't run it again.
-      let g:easytags_python_enabled = 0
-    endtry
-  endif
-  return 0
-endfunction
-
 " Built-in file type & tag kind definitions. {{{1
 
 " Don't bother redefining everything below when this script is sourced again.
@@ -904,14 +849,12 @@ call xolox#easytags#define_tagkind({
       \ 'filetype': 'vim',
       \ 'hlgroup': 'vimFuncName',
       \ 'vim_filter': 'v:val.kind ==# "f" && get(v:val, "cmd", "") !~? ''<sid>\w\|\<s:\w''',
-      \ 'python_filter': { 'kind': 'f', 'nomatch': '(?i)(<sid>\w|\bs:\w)' },
       \ 'pattern_prefix': '\C\%(\<s:\|<[sS][iI][dD]>\)\@<!\<'})
 
 call xolox#easytags#define_tagkind({
       \ 'filetype': 'vim',
       \ 'hlgroup': 'vimScriptFuncName',
       \ 'vim_filter': 'v:val.kind ==# "f" && get(v:val, "cmd", "") =~? ''<sid>\w\|\<s:\w''',
-      \ 'python_filter': { 'kind': 'f', 'match': '(?i)(<sid>\w|\bs:\w)' },
       \ 'pattern_prefix': '\C\%(\<s:\|<[sS][iI][dD]>\)'})
 
 highlight def link vimScriptFuncName vimFuncName
