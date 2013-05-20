@@ -41,6 +41,12 @@ let s:last_automatic_run = 0
 
 function! xolox#easytags#autoload(event) " {{{2
   try
+    if exists('g:SessionLoad') && a:event == 'BufReadPost'
+      " If a session is being loaded, we won't update the tags for files that
+      " are loaded in the session because this disrupts the session loading...
+      call xolox#misc#msg#debug("easytags.vim %s: Skipping update because session is being loaded.", g:xolox#easytags#version)
+      return
+    endif
     let do_update = xolox#misc#option#get('easytags_auto_update', 1)
     let do_highlight = xolox#misc#option#get('easytags_auto_highlight', 1) && &eventignore !~? '\<syntax\>'
     " Don't execute this function for unsupported file types (doesn't load
