@@ -103,39 +103,37 @@ function! xolox#easytags#autoload(event) " {{{2
 endfunction
 
 function! xolox#easytags#update(silent, filter_tags, filenames) " {{{2
+  let context = xolox#easytags#update_phase1(a:silent, a:filter_tags, a:filenames)
+  call xolox#easytags#update_phase2(context)
+endfunction
+
+function! xolox#easytags#update_phase1(silent, filter_tags, filenames) " {{{2
   try
-    let context = s:create_context()
-    let have_args = !empty(a:filenames)
     let starttime = xolox#misc#timer#start()
-    let cfile = s:check_cfile(a:silent, a:filter_tags, have_args)
+    let have_args = !empty(a:filenames)
     let tagsfile = xolox#easytags#get_tagsfile()
-    let cmdline = s:prep_cmdline(cfile, tagsfile, a:filenames, context)
-    let output = s:run_ctags(cmdline)
-    if have_args && !empty(g:easytags_by_filetype)
-      " TODO Get the headers from somewhere?!
-      call s:save_by_filetype(a:filter_tags, [], output, context)
-    else
-      let num_filtered = s:filter_merge_tags(a:filter_tags, tagsfile, output, context)
-    endif
-    if cfile != ''
-      let msg = "easytags.vim %s: Updated tags for %s in %s."
-      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, expand('%:p:~'), starttime)
-    elseif have_args
-      let msg = "easytags.vim %s: Updated tags in %s."
-      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, starttime)
-    else
-      let msg = "easytags.vim %s: Filtered %i invalid tags in %s."
-      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, num_filtered, starttime)
-    endif
-    " When :UpdateTags was executed manually we'll refresh the dynamic
-    " syntax highlighting so that new tags are immediately visible.
-    if !a:silent && xolox#misc#option#get('easytags_auto_highlight', 1)
-      HighlightTags
-    endif
-    return 1
+    let context = s:create_context({
+          \ 'by_filetype': g:easytags_by_filetype,
+          \ 'filter_tags': a:filter_tags,
+          \ 'have_args': have_args,
+          \ 'tagsfile': tagsfile })
+    let cfile = s:check_cfile(a:silent, a:filter_tags, have_args)
+    let context['cmdline'] = s:prep_cmdline(cfile, tagsfile, a:filenames, context)
+    return context
   catch
     call xolox#misc#msg#warn("easytags.vim %s: %s (at %s)", g:xolox#easytags#version, v:exception, v:throwpoint)
+    return {}
   endtry
+endfunction
+
+function! xolox#easytags#update_phase2(context) " {{{2
+  let output = s:run_ctags(a:context['cmdline'])
+  if a:context['have_args'] && !empty(a:context['by_filetype'])
+    " TODO Get the headers from somewhere?!
+    call s:save_by_filetype(a:context['filter_tags'], [], output, a:context)
+  else
+    call s:filter_merge_tags(a:context['filter_tags'], a:context['tagsfile'], output, a:context)
+  endif
 endfunction
 
 function! s:check_cfile(silent, filter_tags, have_args) " {{{3
@@ -340,7 +338,7 @@ function! xolox#easytags#by_filetype(undo) " {{{2
     if empty(g:easytags_by_filetype)
       throw "Please set g:easytags_by_filetype before running :TagsByFileType!"
     endif
-    let context = s:create_context()
+    let context = s:create_context({})
     let global_tagsfile = expand(g:easytags_file)
     let disabled_tagsfile = global_tagsfile . '.disabled'
     if !a:undo
@@ -370,7 +368,9 @@ function! s:save_by_filetype(filter_tags, headers, entries, context)
   for entry in a:entries
     let ctags_ft = matchstr(entry[4], '^language:\zs\S\+$')
     if empty(ctags_ft)
-      " TODO This triggers on entries where the pattern contains tabs. The interesting thing is that Vim reads these entries fine... Fix it in xolox#easytags#read_tagsfile()?
+      " TODO This triggers on entries where the pattern contains tabs. The
+      " interesting thing is that Vim reads these entries fine... Fix it in
+      " xolox#easytags#read_tagsfile()?
       let num_invalid += 1
       if &vbs >= 1
         call xolox#misc#msg#debug("easytags.vim %s: Skipping tag without 'language:' field: %s",
@@ -522,7 +522,7 @@ function! xolox#easytags#file_has_tags(filename) " {{{2
   " caching, but for the intended purpose that's no problem: When editing an
   " existing file which has no tags defined the plug-in will run Exuberant
   " Ctags to update the tags, *unless the file has already been tagged*.
-  call s:cache_tagged_files(s:create_context())
+  call s:cache_tagged_files()
   return has_key(s:tagged_files, s:resolve(a:filename))
 endfunction
 
@@ -531,12 +531,13 @@ if !exists('s:tagged_files')
   let s:known_tagfiles = {}
 endif
 
-function! s:cache_tagged_files(context) " {{{3
+function! s:cache_tagged_files() " {{{3
   if empty(s:tagged_files)
     " Initialize the cache of tagged files on first use. After initialization
     " we'll only update the cache when we're reading a tags file from disk for
     " other purposes anyway (so the cache doesn't introduce too much overhead).
     let starttime = xolox#misc#timer#start()
+    let context = s:create_context({})
     for tagsfile in tagfiles()
       if !filereadable(tagsfile)
         call xolox#misc#msg#warn("easytags.vim %s: Skipping unreadable tags file %s!", g:xolox#easytags#version, tagsfile)
@@ -655,8 +656,11 @@ endfunction
 
 " Miscellaneous script-local functions. {{{1
 
-function! s:create_context() " {{{2
-  return {'cache': {}}
+function! s:create_context(values) " {{{2
+  if !has_key(a:values, 'cache')
+    let a:values['cache'] = {}
+  endif
+  return a:values
 endfunction
 
 function! s:resolve(filename) " {{{2
