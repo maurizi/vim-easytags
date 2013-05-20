@@ -27,13 +27,14 @@ if !exists('g:easytags_by_filetype')
 endif
 
 if !exists('g:easytags_events')
-  let g:easytags_events = []
-  if !exists('g:easytags_on_cursorhold') || g:easytags_on_cursorhold
-    call extend(g:easytags_events, ['CursorHold', 'CursorHoldI'])
-  endif
-  if exists('g:easytags_always_enabled') && g:easytags_always_enabled
-    call extend(g:easytags_events, ['BufReadPost', 'BufWritePost', 'FocusGained', 'ShellCmdPost', 'ShellFilterPost'])
-  endif
+  let g:easytags_events = [
+        \ 'CursorHold',
+        \ 'CursorHoldI',
+        \ 'BufReadPost',
+        \ 'BufWritePost',
+        \ 'FocusGained',
+        \ 'ShellCmdPost',
+        \ 'ShellFilterPost' ]
 endif
 
 if !exists('g:easytags_ignored_filetypes')

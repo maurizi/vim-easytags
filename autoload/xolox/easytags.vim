@@ -1,4 +1,4 @@
-" Vim script
+" Vim auto-load script
 " Author: Peter Odding <peter@peterodding.com>
 " Last Change: May 20, 2013
 " URL: http://peterodding.com/code/vim/easytags/
@@ -103,37 +103,58 @@ function! xolox#easytags#autoload(event) " {{{2
 endfunction
 
 function! xolox#easytags#update(silent, filter_tags, filenames) " {{{2
-  let context = xolox#easytags#update_phase1(a:silent, a:filter_tags, a:filenames)
-  call xolox#easytags#update_phase2(context)
-endfunction
-
-function! xolox#easytags#update_phase1(silent, filter_tags, filenames) " {{{2
   try
     let starttime = xolox#misc#timer#start()
-    let have_args = !empty(a:filenames)
-    let tagsfile = xolox#easytags#get_tagsfile()
-    let context = s:create_context({
-          \ 'by_filetype': g:easytags_by_filetype,
-          \ 'filter_tags': a:filter_tags,
-          \ 'have_args': have_args,
-          \ 'tagsfile': tagsfile })
-    let cfile = s:check_cfile(a:silent, a:filter_tags, have_args)
-    let context['cmdline'] = s:prep_cmdline(cfile, tagsfile, a:filenames, context)
-    return context
+    " Phase #1: Prepare to run Exuberant Ctags and store all of the state
+    " required to execute Exuberant Ctags in a dictionary called "context".
+    let context = s:update_phase_1(a:silent, a:filter_tags, a:filenames)
+    " Store the time when the update process was started inside the context.
+    let context['starttime'] = starttime
+    " Remember whether the user explicitly executed :UpdateTags or we were
+    " executed by an automatic command.
+    let context['silent'] = a:silent
+    " Generate the Vim command needed to start phase #2.
+    let vim_command = printf('let &rtp = %s | call xolox#easytags#update_remote(%s)', string(&rtp), string(context))
+    call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous Vim command: %s", g:xolox#easytags#version, vim_command)
+    " Generate the shell command needed to start phase #2.
+    let shell_command = printf('%s -u NONE -U NONE --noplugin -N --cmd %s',
+          \ xolox#misc#escape#shell(xolox#misc#os#find_vim()),
+          \ xolox#misc#escape#shell(vim_command))
+    call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous shell command: %s", g:xolox#easytags#version, shell_command)
+    " Phase #2: Update the tags asynchronously in a background process.
+    let result = xolox#misc#os#exec({'command': shell_command, 'async': 1})
+    " Report to the user what's happening.
+    call xolox#misc#timer#force("easytags.vim %s: Started asynchronous tag update in %s ..", g:xolox#easytags#version, starttime)
   catch
     call xolox#misc#msg#warn("easytags.vim %s: %s (at %s)", g:xolox#easytags#version, v:exception, v:throwpoint)
     return {}
   endtry
 endfunction
 
-function! xolox#easytags#update_phase2(context) " {{{2
+function! s:update_phase_1(silent, filter_tags, filenames) " {{{3
+  let starttime = xolox#misc#timer#start()
+  let have_args = !empty(a:filenames)
+  let tagsfile = xolox#easytags#get_tagsfile()
+  let context = s:create_context({
+        \ 'filter_tags': a:filter_tags,
+        \ 'have_args': have_args,
+        \ 'tagsfile': tagsfile })
+  let cfile = s:check_cfile(a:silent, a:filter_tags, have_args)
+  let context['cmdline'] = s:prep_cmdline(cfile, tagsfile, a:filenames, context)
+  return context
+endfunction
+
+function! s:update_phase_2(context) " {{{3
   let output = s:run_ctags(a:context['cmdline'])
+  let starttime = xolox#misc#timer#start()
   if a:context['have_args'] && !empty(a:context['by_filetype'])
     " TODO Get the headers from somewhere?!
     call s:save_by_filetype(a:context['filter_tags'], [], output, a:context)
   else
     call s:filter_merge_tags(a:context['filter_tags'], a:context['tagsfile'], output, a:context)
   endif
+  call xolox#misc#timer#stop("easytags.vim %s: Finished merging tags in %s.", g:xolox#easytags#version, starttime)
+  return len(output)
 endfunction
 
 function! s:check_cfile(silent, filter_tags, have_args) " {{{3
@@ -158,7 +179,11 @@ function! s:check_cfile(silent, filter_tags, have_args) " {{{3
     throw "The " . string(&ft) . " file type is explicitly ignored."
   elseif empty(xolox#easytags#select_supported_filetypes(&ft))
     if silent | return '' | endif
-    throw "Exuberant Ctags doesn't support the " . string(&ft) . " file type!"
+    if empty(&ft)
+      throw "Please set the buffer's file type before running Exuberant Ctags!"
+    else
+      throw "Exuberant Ctags doesn't support the " . string(&ft) . " file type!"
+    endif
   endif
   return cfile
 endfunction
@@ -220,8 +245,10 @@ endfunction
 function! s:run_ctags(cmdline) " {{{3
   let lines = []
   if a:cmdline != ''
+    let starttime = xolox#misc#timer#start()
     call xolox#misc#msg#debug("easytags.vim %s: Executing %s.", g:xolox#easytags#version, a:cmdline)
     let lines = xolox#misc#os#exec({'command': a:cmdline})['stdout']
+    call xolox#misc#timer#stop("easytags.vim %s: Exuberant Ctags finished in %s.", g:xolox#easytags#version, starttime)
   endif
   return xolox#easytags#parse_entries(lines)
 endfunction
@@ -244,6 +271,7 @@ function! s:filter_merge_tags(filter_tags, tagsfile, output, context) " {{{3
     call filter(entries, join(filters, ' && '))
   endif
   let num_filtered = num_old_entries - len(entries)
+  call xolox#misc#msg#debug("easytags.vim %s: Filtered %i/%i tags from output of Exuberant Ctags.", g:xolox#easytags#version, num_filtered, num_old_entries)
   " Merge the old and new tags.
   call extend(entries, a:output)
   " Since we've already read the tags file we might as well cache the tagged
@@ -387,7 +415,7 @@ function! s:save_by_filetype(filter_tags, headers, entries, context)
   if num_invalid > 0
     call xolox#misc#msg#warn("easytags.vim %s: Skipped %i lines without 'language:' tag!", g:xolox#easytags#version, num_invalid)
   endif
-  let directory = xolox#misc#path#absolute(g:easytags_by_filetype)
+  let directory = xolox#misc#path#absolute(a:context['by_filetype'])
   for vim_ft in keys(filetypes)
     let tagsfile = xolox#misc#path#merge(directory, vim_ft)
     let existing = filereadable(tagsfile)
@@ -542,11 +570,11 @@ function! s:cache_tagged_files() " {{{3
       if !filereadable(tagsfile)
         call xolox#misc#msg#warn("easytags.vim %s: Skipping unreadable tags file %s!", g:xolox#easytags#version, tagsfile)
       else
-        let fname = s:canonicalize(tagsfile, a:context)
+        let fname = s:canonicalize(tagsfile, context)
         let ftime = getftime(fname)
         if get(s:known_tagfiles, fname, 0) != ftime
           let [headers, entries] = xolox#easytags#read_tagsfile(fname)
-          call s:cache_tagged_files_in(fname, ftime, entries, a:context)
+          call s:cache_tagged_files_in(fname, ftime, entries, context)
         endif
       endif
     endfor
@@ -654,13 +682,97 @@ function! xolox#easytags#to_ctags_ft(vim_ft) " {{{2
   return index >= 0 ? s:ctags_filetypes[index] : type
 endfunction
 
+" Handling of asynchronous (background) execution. {{{1
+
+function! xolox#easytags#update_remote(context) " {{{2
+  " This is phase #2 which is executed by phase #1. We are running in an
+  " asynchronous background process, so any errors here will be hidden from
+  " the view of the user...
+  try
+    let &verbose = a:context['verbose']
+    let a:context['tags_written'] = s:update_phase_2(a:context)
+    if has_key(a:context, 'servername')
+      call xolox#misc#msg#info("easytags.vim %s: Notifying remote Vim of successful tag update ..", g:xolox#easytags#version)
+      if &verbose >= 1
+        let a:context['messages'] = g:xolox_messages
+      endif
+      call remote_expr(a:context.servername, printf('xolox#easytags#remote_callback(%s)', string(a:context)))
+    else
+      call xolox#misc#msg#info("easytags.vim %s: Cannot notify remote Vim of our success!", g:xolox#easytags#version)
+    endif
+  catch
+    if has_key(a:context, 'servername')
+      call xolox#misc#msg#info("easytags.vim %s: Notifying remote Vim of failed tag update ..", g:xolox#easytags#version)
+      let a:context['exception'] = v:exception
+      let a:context['throwpoint'] = v:throwpoint
+      call remote_expr(a:context.servername, printf('xolox#easytags#remote_callback(%s)', string(a:context)))
+    else
+      call xolox#misc#msg#warn("easytags.vim %s: Cannot notify remote Vim of failed tag update!", g:xolox#easytags#version)
+    endif
+  finally
+    quit
+  endtry
+endfunction
+
+function! xolox#easytags#remote_callback(context) " {{{2
+  " This is phase #3 which is executed by phase #2. We are now back in the
+  " user's Vim editing session through the wonders of server/client
+  " communication :-).
+  if has_key(a:context, 'exception')
+    call xolox#misc#msg#warn("easytags.vim %s: Asynchronous tag update failed: %s (at %s)", g:xolox#easytags#version, a:context['exception'], a:context['throwpoint'])
+  else
+    " When :UpdateTags was executed manually we'll refresh the dynamic
+    " syntax highlighting so that new tags are immediately visible.
+    if !a:context['silent'] && xolox#misc#option#get('easytags_auto_highlight', 1)
+      HighlightTags
+    endif
+    " Relay messages reported in the hidden Vim process?
+    if a:context['verbose'] >= 1
+      for message in a:context['messages']
+        call xolox#misc#msg#info("easytags.vim %s: Relaying message from other side: %s", g:xolox#easytags#version, message)
+      endfor
+    endif
+    " Let the user know what happened.
+    let msg = "easytags.vim %s: Finished asynchronous tag update in %s (wrote %i tags to %s)."
+    call xolox#misc#timer#force(msg,
+          \ g:xolox#easytags#version,
+          \ a:context['starttime'],
+          \ a:context['tags_written'],
+          \ fnamemodify(a:context['tagsfile'], ':~'))
+  endif
+endfunction
+
 " Miscellaneous script-local functions. {{{1
 
 function! s:create_context(values) " {{{2
+
+  " Save the current verbosity level in the context.
+  let a:values['verbose'] = &verbose
+
+  " When updating tags asynchronously, the user's vimrc script is not loaded
+  " to improve performance and avoid side effects. However this means we have
+  " to pass the location of the file type specific tags files explicitly
+  " through the context.
+  if !has_key(a:values, 'by_filetype')
+    let a:values['by_filetype'] = g:easytags_by_filetype
+  endif
+
+  " If the user's Vim session has a server name set, we save it in the context
+  " so that the Vim running asynchronously can report its results to the
+  " user's Vim session.
+  if !empty(v:servername)
+    let a:values['servername'] = v:servername
+  endif
+
+  " The context is used to keep a dictionary with previously canonicalized
+  " pathnames to avoid making library calls to ask questions that we already
+  " know the answers to.
   if !has_key(a:values, 'cache')
     let a:values['cache'] = {}
   endif
+
   return a:values
+
 endfunction
 
 function! s:resolve(filename) " {{{2

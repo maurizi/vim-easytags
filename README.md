@@ -30,13 +30,13 @@ This command executes [Exuberant Ctags] [exctags] from inside Vim to update the 
 
 When you execute this command like `:UpdateTags!` (including the bang!) then all tags whose files are missing will be filtered from the global tags file.
 
-Note that this command will be executed automatically every once in a while, assuming you haven't changed `g:easytags_on_cursorhold`.
+Note that this command will be executed automatically every once in a while, assuming you haven't changed `g:easytags_events`.
 
 ### The `:HighlightTags` command
 
 When you execute this command while editing one of the supported file types (see above) the relevant tags in the current file are highlighted. The tags to highlight are gathered from all tags files known to Vim (through the ['tags' option] [tags_opt]).
 
-Note that this command will be executed automatically every once in a while, assuming you haven't changed `g:easytags_on_cursorhold`.
+Note that this command will be executed automatically every once in a while, assuming you haven't changed `g:easytags_events`.
 
 ## Options
 
@@ -106,31 +106,9 @@ If you already have a global tags file you can create file type specific tags fi
 
 ### The `g:easytags_events` option
 
-This option can be used to customize the events that trigger the automatic updating and highlighting performed by the easytags plug-in. The `g:easytags_always_enabled` and `g:easytags_on_cursorhold` options are more user friendly but limited ways to accomplish the same thing.
-
-Here's an example: Say you want the easytags plug-in to automatically update & highlight tags for the current file right after you save the file. You can accomplish this by adding the following line to your [vimrc script] [vimrc]:
+This option can be used to customize the events that trigger the automatic updating and highlighting performed by the easytags plug-in. An example: Say you want the easytags plug-in to automatically update & highlight tags for the current file right after you save the file. You can accomplish this by adding the following line to your [vimrc script] [vimrc]:
 
     :let g:easytags_events = ['BufWritePost']
-
-Note that if you set `g:easytags_events` in your [vimrc script] [vimrc], the values of the options `g:easytags_always_enabled` and `g:easytags_on_cursorhold` will be ignored completely.
-
-### The `g:easytags_always_enabled` option
-
-By default the plug-in automatically generates and highlights tags when you stop typing for a few seconds (this works using the [CursorHold] [cursorhold] automatic command). This means that when you edit a file, the dynamic highlighting won't appear until you pause for a moment. If you don't like this you can configure the plug-in to always enable dynamic highlighting:
-
-    :let g:easytags_always_enabled = 1
-
-Be warned that after setting this option you'll probably notice why it's disabled by default: Every time you edit a file in Vim, the plug-in will first run Exuberant Ctags and then highlight the tags, and this slows Vim down quite a lot. I have some ideas on how to improve this latency by running Exuberant Ctags in the background so stay tuned!
-
-Note: If you change this option it won't apply until you restart Vim, so you'll have to set this option in your [vimrc script] [vimrc].
-
-### The `g:easytags_on_cursorhold` option
-
-As I explained above the plug-in by default doesn't update or highlight your tags until you stop typing for a moment. The plug-in tries hard to do the least amount of work possible in this break but it might still interrupt your workflow. If it does you can disable the periodic update:
-
-    :let g:easytags_on_cursorhold = 0
-
-Note: Like the `g:easytags_always_enabled` option, if you change this option it won't apply until you restart Vim, so you'll have to set this option in your [vimrc script] [vimrc].
 
 ### The `g:easytags_updatetime_min` option
 
