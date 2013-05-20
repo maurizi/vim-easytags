@@ -109,26 +109,23 @@ function! xolox#easytags#update(silent, filter_tags, filenames) " {{{2
     let starttime = xolox#misc#timer#start()
     let cfile = s:check_cfile(a:silent, a:filter_tags, have_args)
     let tagsfile = xolox#easytags#get_tagsfile()
-    let firstrun = !filereadable(tagsfile)
-    let cmdline = s:prep_cmdline(cfile, tagsfile, firstrun, a:filenames, context)
-    let output = s:run_ctags(starttime, cfile, tagsfile, firstrun, cmdline)
-    if !firstrun
-      if have_args && !empty(g:easytags_by_filetype)
-        " TODO Get the headers from somewhere?!
-        call s:save_by_filetype(a:filter_tags, [], output, context)
-      else
-        let num_filtered = s:filter_merge_tags(a:filter_tags, tagsfile, output, context)
-      endif
-      if cfile != ''
-        let msg = "easytags.vim %s: Updated tags for %s in %s."
-        call xolox#misc#timer#stop(msg, g:xolox#easytags#version, expand('%:p:~'), starttime)
-      elseif have_args
-        let msg = "easytags.vim %s: Updated tags in %s."
-        call xolox#misc#timer#stop(msg, g:xolox#easytags#version, starttime)
-      else
-        let msg = "easytags.vim %s: Filtered %i invalid tags in %s."
-        call xolox#misc#timer#stop(msg, g:xolox#easytags#version, num_filtered, starttime)
-      endif
+    let cmdline = s:prep_cmdline(cfile, tagsfile, a:filenames, context)
+    let output = s:run_ctags(cmdline)
+    if have_args && !empty(g:easytags_by_filetype)
+      " TODO Get the headers from somewhere?!
+      call s:save_by_filetype(a:filter_tags, [], output, context)
+    else
+      let num_filtered = s:filter_merge_tags(a:filter_tags, tagsfile, output, context)
+    endif
+    if cfile != ''
+      let msg = "easytags.vim %s: Updated tags for %s in %s."
+      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, expand('%:p:~'), starttime)
+    elseif have_args
+      let msg = "easytags.vim %s: Updated tags in %s."
+      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, starttime)
+    else
+      let msg = "easytags.vim %s: Filtered %i invalid tags in %s."
+      call xolox#misc#timer#stop(msg, g:xolox#easytags#version, num_filtered, starttime)
     endif
     " When :UpdateTags was executed manually we'll refresh the dynamic
     " syntax highlighting so that new tags are immediately visible.
@@ -168,21 +165,14 @@ function! s:check_cfile(silent, filter_tags, have_args) " {{{3
   return cfile
 endfunction
 
-function! s:prep_cmdline(cfile, tagsfile, firstrun, arguments, context) " {{{3
+function! s:prep_cmdline(cfile, tagsfile, arguments, context) " {{{3
   let languages = xolox#misc#option#get('easytags_languages', {})
   let applicable_filetypes = xolox#easytags#select_supported_filetypes(&ft)
   let ctags_language_name = xolox#easytags#to_ctags_ft(applicable_filetypes[0])
   let language = get(languages, ctags_language_name, {})
   if empty(language)
     let program = xolox#misc#option#get('easytags_cmd')
-    let cmdline = [program, '--fields=+l', '--c-kinds=+p', '--c++-kinds=+p']
-    if a:firstrun
-      call add(cmdline, xolox#misc#escape#shell('-f' . a:tagsfile))
-      call add(cmdline, '--sort=' . (&ic ? 'foldcase' : 'yes'))
-    else
-      call add(cmdline, '--sort=no')
-      call add(cmdline, '-f-')
-    endif
+    let cmdline = [program, '--fields=+l', '--c-kinds=+p', '--c++-kinds=+p', '--sort=no', '-f-']
     if xolox#misc#option#get('easytags_include_members', 0)
       call add(cmdline, '--extra=+q')
     endif
@@ -193,11 +183,7 @@ function! s:prep_cmdline(cfile, tagsfile, firstrun, arguments, context) " {{{3
       return
     endif
     let cmdline = [program] + get(language, 'args', [])
-    if a:firstrun
-      call add(cmdline, xolox#misc#escape#shell(get(language, 'fileoutput_opt', '-f') . a:tagsfile))
-    else
-      call add(cmdline, xolox#misc#escape#shell(get(language, 'stdout_opt', '-f-')))
-    endif
+    call add(cmdline, xolox#misc#escape#shell(get(language, 'stdout_opt', '-f-')))
   endif
   let have_args = 0
   if a:cfile != ''
@@ -233,19 +219,11 @@ function! s:prep_cmdline(cfile, tagsfile, firstrun, arguments, context) " {{{3
   return have_args ? join(cmdline) : ''
 endfunction
 
-function! s:run_ctags(starttime, cfile, tagsfile, firstrun, cmdline) " {{{3
+function! s:run_ctags(cmdline) " {{{3
   let lines = []
   if a:cmdline != ''
     call xolox#misc#msg#debug("easytags.vim %s: Executing %s.", g:xolox#easytags#version, a:cmdline)
     let lines = xolox#misc#os#exec({'command': a:cmdline})['stdout']
-    if a:firstrun
-      if a:cfile != ''
-        call xolox#misc#timer#stop("easytags.vim %s: Generated new tags for %s in %s.", g:xolox#easytags#version, expand('%:p:~'), a:starttime)
-      else
-        call xolox#misc#timer#stop("easytags.vim %s: Generated new tags in %s.", g:xolox#easytags#version, a:starttime)
-      endif
-      return []
-    endif
   endif
   return xolox#easytags#parse_entries(lines)
 endfunction

@@ -64,7 +64,6 @@ Exuberant Ctags supports many languages and can be extended via regular expressi
     \   'language': {
     \     'cmd': g:easytags_cmd,
     \	    'args': [],
-    \	    'fileoutput_opt': '-f',
     \	    'stdout_opt': '-f-',
     \	    'recurse_flag': '-R'
     \   }
