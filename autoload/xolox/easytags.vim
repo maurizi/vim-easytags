@@ -151,7 +151,7 @@ function! s:update_phase_1(silent, filter_tags, filenames) " {{{3
 endfunction
 
 function! s:update_phase_2(context) " {{{3
-  let output = s:run_ctags(a:context['cmdline'])
+  let output = s:run_ctags(join(map(a:context['cmdline'], 'xolox#misc#escape#shell(v:val)')))
   let starttime = xolox#misc#timer#start()
   if a:context['have_args'] && !empty(a:context['by_filetype'])
     " TODO Get the headers from somewhere?!
@@ -212,21 +212,21 @@ function! s:prep_cmdline(cfile, tagsfile, arguments, context) " {{{3
       return
     endif
     let cmdline = [program] + get(language, 'args', [])
-    call add(cmdline, xolox#misc#escape#shell(get(language, 'stdout_opt', '-f-')))
+    call add(cmdline, get(language, 'stdout_opt', '-f-'))
   endif
   let have_args = 0
   if a:cfile != ''
     if xolox#misc#option#get('easytags_autorecurse', 0)
-      call add(cmdline, empty(language) ? '-R' : xolox#misc#escape#shell(get(language, 'recurse_flag', '-R')))
-      call add(cmdline, xolox#misc#escape#shell(a:cfile))
+      call add(cmdline, empty(language) ? '-R' : get(language, 'recurse_flag', '-R'))
+      call add(cmdline, a:cfile)
     else
       if empty(language)
         " TODO Should --language-force distinguish between C and C++?
         " TODO --language-force doesn't make sense for JavaScript tags in HTML files?
         let filetype = xolox#easytags#to_ctags_ft(applicable_filetypes[0])
-        call add(cmdline, xolox#misc#escape#shell('--language-force=' . filetype))
+        call add(cmdline, '--language-force=' . filetype)
       endif
-      call add(cmdline, xolox#misc#escape#shell(a:cfile))
+      call add(cmdline, a:cfile)
     endif
     let have_args = 1
   else
@@ -237,7 +237,7 @@ function! s:prep_cmdline(cfile, tagsfile, arguments, context) " {{{3
       else
         let matches = split(expand(arg), "\n")
         if !empty(matches)
-          call map(matches, 'xolox#misc#escape#shell(s:canonicalize(v:val, a:context))')
+          call map(matches, 's:canonicalize(v:val, a:context)')
           call extend(cmdline, matches)
           let have_args = 1
         endif
@@ -245,7 +245,7 @@ function! s:prep_cmdline(cfile, tagsfile, arguments, context) " {{{3
     endfor
   endif
   " No need to run Exuberant Ctags without any filename arguments!
-  return have_args ? join(cmdline) : ''
+  return have_args ? cmdline : []
 endfunction
 
 function! s:run_ctags(cmdline) " {{{3
