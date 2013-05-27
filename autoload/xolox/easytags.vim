@@ -121,7 +121,7 @@ function! xolox#easytags#update(silent, filter_tags, filenames) " {{{2
     let vim_command = printf('let &rtp = %s | call xolox#easytags#update_remote(%s)', string(&rtp), string(context))
     call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous Vim command: %s", g:xolox#easytags#version, vim_command)
     " Generate the shell command needed to start phase #2.
-    let shell_command = printf('%s -u NONE -U NONE --noplugin -N --cmd %s',
+    let shell_command = printf('%s -u NONE -U NONE --noplugin -n -N -i NONE --cmd %s',
           \ xolox#misc#escape#shell(xolox#misc#os#find_vim()),
           \ xolox#misc#escape#shell(vim_command))
     call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous shell command: %s", g:xolox#easytags#version, shell_command)
