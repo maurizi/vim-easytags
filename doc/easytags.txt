@@ -7,30 +7,30 @@ Contents ~
  2. Installation                                        |easytags-installation|
   1. A note about Windows                         |easytags-note-about-windows|
  3. Commands                                                |easytags-commands|
-  1. The :UpdateTags command
-  2. The :HighlightTags command
+  1. The |:UpdateTags| command
+  2. The |:HighlightTags| command
  4. Options                                                  |easytags-options|
-  1. The g:easytags_cmd option
-  2. The g:easytags_languages option
-  3. The g:easytags_file option
-  4. The g:easytags_dynamic_files option
-  5. The g:easytags_by_filetype option
-  6. The g:easytags_events option
-  7. The g:easytags_updatetime_min option
-  8. The g:easytags_updatetime_warn option
-  9. The g:easytags_auto_update option
-  10. The g:easytags_auto_highlight option
-  11. The g:easytags_autorecurse option
-  12. The g:easytags_include_members option
-  13. The g:easytags_resolve_links option
-  14. The g:easytags_suppress_ctags_warning option
-  15. The g:easytags_ignored_syntax_groups option
+  1. The |g:easytags_cmd| option
+  2. The |g:easytags_languages| option
+  3. The |g:easytags_file| option
+  4. The |g:easytags_dynamic_files| option
+  5. The |g:easytags_by_filetype| option
+  6. The |g:easytags_events| option
+  7. The |g:easytags_updatetime_min| option
+  8. The |g:easytags_updatetime_warn| option
+  9. The |g:easytags_auto_update| option
+  10. The |g:easytags_auto_highlight| option
+  11. The |g:easytags_autorecurse| option
+  12. The |g:easytags_include_members| option
+  13. The |g:easytags_resolve_links| option
+  14. The |g:easytags_suppress_ctags_warning| option
+  15. The |g:easytags_ignored_syntax_groups| option
  5. Customizing the easytags plug-in             |customizing-easytags-plug-in|
   1. Passing custom command line arguments to Exuberant Ctags |easytags-passing-custom-command-line-arguments-to-exuberant-ctags|
   2. Update & highlight tags immediately after save |easytags-update-highlight-tags-immediately-after-save|
   3. How to customize the highlighting colors? |easytags-how-to-customize-highlighting-colors|
  6. Troubleshooting                                  |easytags-troubleshooting|
-  1. :HighlightTags only works for the tags file created by :UpdateTags |easytags-highlighttags-only-works-for-tags-file-created-by-updatetags|
+  1. |:HighlightTags| only works for the tags file created by |:UpdateTags| |easytags-highlighttags-only-works-for-tags-file-created-by-updatetags|
   2. The plug-in complains that Exuberant Ctags isn't installed |easytags-plug-in-complains-that-exuberant-ctags-isnt-installed|
   3. Vim locks up while the plug-in is running |easytags-vim-locks-up-while-plug-in-is-running|
   4. Failed to highlight tags because pattern is too big! |easytags-failed-to-highlight-tags-because-pattern-is-too-big|

@@ -1,6 +1,6 @@
 " Vim auto-load script
 " Author: Peter Odding <peter@peterodding.com>
-" Last Change: May 25, 2013
+" Last Change: June , 2013
 " URL: http://peterodding.com/code/vim/easytags/
 
 let g:xolox#easytags#version = '3.3.6'
@@ -117,16 +117,8 @@ function! xolox#easytags#update(silent, filter_tags, filenames) " {{{2
     " Remember whether the user explicitly executed :UpdateTags or we were
     " executed by an automatic command.
     let context['silent'] = a:silent
-    " Generate the Vim command needed to start phase #2.
-    let vim_command = printf('let &rtp = %s | call xolox#easytags#update_remote(%s)', string(&rtp), string(context))
-    call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous Vim command: %s", g:xolox#easytags#version, vim_command)
-    " Generate the shell command needed to start phase #2.
-    let shell_command = printf('%s -u NONE -U NONE --noplugin -n -N -i NONE --cmd %s',
-          \ xolox#misc#escape#shell(xolox#misc#os#find_vim()),
-          \ xolox#misc#escape#shell(vim_command))
-    call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous shell command: %s", g:xolox#easytags#version, shell_command)
     " Phase #2: Update the tags asynchronously in a background process.
-    let result = xolox#misc#os#exec({'command': shell_command, 'async': 1})
+    call xolox#easytags#call_remote('xolox#easytags#update_remote', [context])
     " Report to the user what's happening.
     call xolox#misc#timer#force("easytags.vim %s: Started asynchronous tag update in %s ..", g:xolox#easytags#version, starttime)
   catch
@@ -687,6 +679,17 @@ function! xolox#easytags#to_ctags_ft(vim_ft) " {{{2
 endfunction
 
 " Handling of asynchronous (background) execution. {{{1
+
+function! xolox#easytags#call_remote(function, arguments)
+  " This is phase #1, where we prepare and launch phase #2.
+  let vim_command = printf('let &rtp = %s | call call(%s, %s)', string(&rtp), string(a:function), string(a:arguments))
+  call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous Vim command: %s", g:xolox#easytags#version, vim_command)
+  let shell_command = printf('%s -u NONE -U NONE --noplugin -n -N -i NONE --cmd %s',
+        \ xolox#misc#escape#shell(xolox#misc#os#find_vim()),
+        \ xolox#misc#escape#shell(vim_command))
+  call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous shell command: %s", g:xolox#easytags#version, shell_command)
+  call xolox#misc#os#exec({'command': shell_command, 'async': 1})
+endfunction
 
 function! xolox#easytags#update_remote(context) " {{{2
   " This is phase #2 which is executed by phase #1. We are running in an
