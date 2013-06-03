@@ -1,6 +1,6 @@
 " Vim auto-load script
 " Author: Peter Odding <peter@peterodding.com>
-" Last Change: June , 2013
+" Last Change: June 3, 2013
 " URL: http://peterodding.com/code/vim/easytags/
 
 let g:xolox#easytags#version = '3.3.6'
@@ -681,11 +681,13 @@ endfunction
 " Handling of asynchronous (background) execution. {{{1
 
 function! xolox#easytags#call_remote(function, arguments)
-  " This is phase #1, where we prepare and launch phase #2.
+  " This is phase #1, where we prepare and launch phase #2. We explicitly use
+  " 'vim' instead of 'gvim' (regardless of v:progname) because 'gvim' will
+  " show dialogs if it doesn't have a window to display :echomsg output.
   let vim_command = printf('let &rtp = %s | call call(%s, %s)', string(&rtp), string(a:function), string(a:arguments))
   call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous Vim command: %s", g:xolox#easytags#version, vim_command)
   let shell_command = printf('%s -u NONE -U NONE --noplugin -n -N -i NONE --cmd %s',
-        \ xolox#misc#escape#shell(xolox#misc#os#find_vim()),
+        \ xolox#misc#escape#shell(xolox#misc#os#find_vim('vim')),
         \ xolox#misc#escape#shell(vim_command))
   call xolox#misc#msg#debug("easytags.vim %s: Generated asynchronous shell command: %s", g:xolox#easytags#version, shell_command)
   call xolox#misc#os#exec({'command': shell_command, 'async': 1})
