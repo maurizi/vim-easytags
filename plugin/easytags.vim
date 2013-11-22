@@ -40,6 +40,10 @@ if !exists('g:easytags_by_filetype')
   let g:easytags_by_filetype = ''
 endif
 
+if !exists('g:easytags_use_wildignore')
+  let g:easytags_use_wildignore = 1
+endif
+
 if !exists('g:easytags_events')
   let g:easytags_events = ['BufWritePost']
   if !exists('g:easytags_on_cursorhold') || g:easytags_on_cursorhold

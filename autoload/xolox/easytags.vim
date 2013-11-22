@@ -255,6 +255,16 @@ function! s:prep_cmdline(cfile, tagsfile, arguments) " {{{3
     let cmdline = [program] + get(language, 'args', [])
     call add(cmdline, xolox#misc#escape#shell(get(language, 'stdout_opt', '-f-')))
   endif
+  if g:easytags_use_wildignore
+    " Need to add directory patterns twice because ctags doesn't seem to
+    " recognize */dir/* for the base directory
+    for pattern in xolox#misc#option#split(&wildignore)
+      if pattern =~ '^\*/'
+        call add(cmdline, xolox#misc#escape#shell('--exclude=' . strpart(pattern, 2)))
+      endif
+      call add(cmdline, xolox#misc#escape#shell('--exclude=' . pattern))
+    endfor
+  endif
   let have_args = 0
   if a:cfile != ''
     if xolox#misc#option#get('easytags_autorecurse', 0)
