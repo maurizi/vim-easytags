@@ -265,6 +265,14 @@ function! s:prep_cmdline(cfile, tagsfile, arguments) " {{{3
       call add(cmdline, xolox#misc#escape#shell('--exclude=' . pattern))
     endfor
   endif
+  if g:easytags_custom_ignore != ''
+    for pattern in xolox#misc#option#split(g:easytags_custom_ignore)
+      if pattern =~ '^\*/'
+        call add(cmdline, xolox#misc#escape#shell('--exclude=' . strpart(pattern, 2)))
+      endif
+      call add(cmdline, xolox#misc#escape#shell('--exclude=' . pattern))
+    endfor
+  endif
   let have_args = 0
   if a:cfile != ''
     if xolox#misc#option#get('easytags_autorecurse', 0)

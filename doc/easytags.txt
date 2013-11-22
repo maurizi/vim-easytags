@@ -29,6 +29,7 @@ Contents ~
   17. The |g:easytags_suppress_ctags_warning| option
   18. The |g:easytags_suppress_report| option
   19. The |g:easytags_use_wildignore| option
+  20. The |g:easytags_custom_ignore| option
  5. Customizing the easytags plug-in             |customizing-easytags-plug-in|
   1. Passing custom command line arguments to Exuberant Ctags |easytags-passing-custom-command-line-arguments-to-exuberant-ctags|
   2. Update & highlight tags immediately after save |easytags-update-highlight-tags-immediately-after-save|
@@ -485,6 +486,15 @@ If this is set and not false, it will use the standard vim wildignore setting
 to exclude files and folders from the tag file by using ctags --exclude option
 >
   :let g:easytags_use_wild_ignore = 1
+<
+-------------------------------------------------------------------------------
+The *g:easytags_custom_ignore* option
+
+This option follows the same semantics of wildignore.  It's intended use is
+for excluding files from the tag file without needing to put them in
+wildignore, which affects many things besides easytags
+>
+  :let g:easytags_custom_ignore = ''
 <
 ===============================================================================
                                                  *customizing-easytags-plug-in*

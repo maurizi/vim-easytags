@@ -44,6 +44,10 @@ if !exists('g:easytags_use_wildignore')
   let g:easytags_use_wildignore = 1
 endif
 
+if !exists('g:easytags_custom_ignore')
+  let g:easytags_custom_ignore = ''
+endif
+
 if !exists('g:easytags_events')
   let g:easytags_events = ['BufWritePost']
   if !exists('g:easytags_on_cursorhold') || g:easytags_on_cursorhold
